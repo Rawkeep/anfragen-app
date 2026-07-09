@@ -1,0 +1,9 @@
+{
+  "name": "anfragen",
+  "version": "1.0.0",
+  "description": "Frachtanfragen, Palettenberechnung & Containerberechnung — eigenständige Offline-App (extrahiert aus Export Afrika Pro)",
+  "private": true,
+  "scripts": {
+    "serve": "node _serve.js"
+  }
+}

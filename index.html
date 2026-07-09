@@ -1,0 +1,669 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#1a56db">
+  <title>Anfragen — Fracht, Paletten & Container</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+
+<header class="app-header">
+  <div class="app-logo">
+    <span class="logo-badge">📋</span>
+    <span>Anfragen<small data-i18n>Fracht · Paletten · Container</small></span>
+  </div>
+  <nav class="app-nav" aria-label="Hauptnavigation">
+    <div class="nav-item" data-view="anfragen" data-click="go('anfragen')" data-i18n>📋 Anfragen</div>
+    <div class="nav-item" data-view="paletten" data-click="go('paletten')" data-i18n>🔲 Palettenrechner</div>
+    <div class="nav-item" data-view="container" data-click="go('container')" data-i18n>🚢 Containerrechner</div>
+  </nav>
+  <div class="role-switch">
+    <label for="roleSelect" style="font-size:10px;color:var(--text-3);font-weight:700;text-transform:uppercase;letter-spacing:.04em" data-i18n>Rolle</label>
+    <select class="form-select" id="roleSelect" style="width:auto;padding:6px 10px;font-size:12px" data-change="setRole('$value')">
+      <option value="aussendienst" data-i18n>🧑‍💼 Außendienst</option>
+      <option value="innendienst" data-i18n>🏢 Innendienst</option>
+      <option value="transport" data-i18n>🚚 Team Transport</option>
+    </select>
+    <select class="form-select" id="langSelect" style="width:auto;padding:6px 10px;font-size:12px" data-change="setLang('$value')" title="Sprache / Language">
+      <option value="de">🇩🇪 DE</option>
+      <option value="en">🇬🇧 EN</option>
+    </select>
+    <button class="btn btn-ghost btn-icon" data-click="openSettingsModal()" title="Einstellungen / Settings">⚙️</button>
+  </div>
+</header>
+
+<main>
+
+  <!-- ════════════════ ANSICHT: ANFRAGEN ════════════════ -->
+  <section class="view hidden" id="v-anfragen" aria-label="Anfragen">
+    <div class="view-head">
+      <div>
+        <h1 data-i18n>Frachtanfragen</h1>
+        <div class="sub"><span data-i18n>Außendienst → Innendienst → Transport → Außendienst</span> &nbsp;·&nbsp; <span id="roleHint" style="font-weight:600;color:var(--brand)"></span></div>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <input type="search" class="search-input" id="inqSearch" placeholder="Suchen: Kunde, Land, Nr., Artikel…" data-input="filterInquiries('$value')" data-i18n-ph>
+        <button class="btn btn-ghost" data-click="exportInquiriesJSON()" title="Export JSON">⬇ Export</button>
+        <button class="btn btn-ghost" data-click="importInquiriesJSON()" title="Import JSON">⬆ Import</button>
+        <button class="btn btn-primary" data-click="openInquiryModal()" data-i18n>+ Neue Anfrage</button>
+      </div>
+    </div>
+
+    <!-- Mein Bereich: rollenspezifischer Eingabe-/Aufgaben-Bereich -->
+    <div id="roleWorkspace"></div>
+
+    <h2 class="overview-title" data-i18n>Übersicht</h2>
+    <div class="kpi-bar" id="inqKpiBar"></div>
+
+    <div class="tabs" id="inqTabs">
+      <button class="tab active" data-filter="all" data-click="setInqFilter('all', el)" data-i18n>Alle</button>
+      <button class="tab" data-filter="entwurf" data-click="setInqFilter('entwurf', el)" data-i18n>Entwurf</button>
+      <button class="tab" data-filter="neu" data-click="setInqFilter('neu', el)" data-i18n>Neu</button>
+      <button class="tab" data-filter="transport" data-click="setInqFilter('transport', el)" data-i18n>Bei Transport</button>
+      <button class="tab" data-filter="kalkuliert" data-click="setInqFilter('kalkuliert', el)" data-i18n>Kalkuliert</button>
+      <button class="tab" data-filter="beantwortet" data-click="setInqFilter('beantwortet', el)" data-i18n>Beantwortet</button>
+      <button class="tab" data-filter="angenommen" data-click="setInqFilter('angenommen', el)" data-i18n>Angenommen</button>
+      <button class="tab" data-filter="abgelehnt" data-click="setInqFilter('abgelehnt', el)" data-i18n>Abgelehnt</button>
+    </div>
+
+    <div class="table-wrap">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th data-i18n>Nr.</th><th data-i18n>Datum</th><th data-i18n>Kunde</th><th data-i18n>Land</th><th data-i18n>Incoterm</th>
+            <th data-i18n>Transport</th><th data-i18n>Kalkulation / Spediteur</th><th data-i18n>Angebote</th>
+            <th data-i18n>Aufschlag</th><th data-i18n>EK</th><th data-i18n>VK</th><th data-i18n>Status</th><th data-i18n>Aktionen</th>
+          </tr>
+        </thead>
+        <tbody id="inqTbody"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ════════════════ ANSICHT: PALETTENRECHNER ════════════════ -->
+  <section class="view hidden" id="v-paletten" aria-label="Palettenrechner">
+    <div class="view-head">
+      <div>
+        <h1 data-i18n>Palettenrechner</h1>
+        <div class="sub">Stückzahl oder Nettogewicht → Paletten, Lagen, Höhen, Bruttogewicht (Europalette 120×80, max. 500 kg netto/Pal.)</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="form-row-4">
+        <div class="form-group">
+          <label class="form-label" data-i18n>Packstück</label>
+          <select class="form-select" id="fPalArticle" data-change="runPalletCalc()"></select>
+        </div>
+        <div class="form-group">
+          <label class="form-label" data-i18n>Eingabe-Modus</label>
+          <select class="form-select" id="fPalMode" data-change="togglePalMode()">
+            <option value="qty" data-i18n>Stückzahl</option>
+            <option value="netto" data-i18n>Nettogewicht (kg)</option>
+          </select>
+        </div>
+        <div class="form-group" id="palQtyWrap">
+          <label class="form-label" data-i18n>Stückzahl</label>
+          <input type="number" class="form-input" id="fPalQty" min="1" placeholder="z.B. 60" data-input="runPalletCalc()">
+        </div>
+        <div class="form-group" id="palNettoWrap" style="display:none">
+          <label class="form-label" data-i18n>Nettogewicht (kg)</label>
+          <input type="number" class="form-input" id="fPalNetto" min="1" step="any" placeholder="z.B. 1500" data-input="runPalletCalc()">
+        </div>
+        <div class="form-group">
+          <label class="form-label" data-i18n>Max. Palettenhöhe (cm)</label>
+          <div style="display:flex;gap:6px">
+            <input type="number" class="form-input" id="fPalMaxHeight" min="0" placeholder="kein Limit" data-input="runPalletCalc()">
+            <button class="btn btn-ghost btn-sm" data-click="setPalHeightPreset(160)" title="Luftfracht-Limit" style="white-space:nowrap;flex-shrink:0">✈️ 160</button>
+            <button class="btn btn-ghost btn-sm" data-click="setPalHeightPreset('')" title="Limit entfernen" style="flex-shrink:0">∅</button>
+          </div>
+        </div>
+      </div>
+      <div class="calc-result" id="palCalcResult" style="display:none"></div>
+    </div>
+
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+        <h2 style="margin:0" data-i18n>Packstück-Katalog</h2>
+        <div style="display:flex;gap:8px">
+          <button class="btn btn-ghost btn-sm" data-click="resetPackstuecke()" title="Reset">↺ Zurücksetzen</button>
+          <button class="btn btn-primary btn-sm" data-click="openPackstueckModal()" data-i18n>+ Neues Packstück</button>
+        </div>
+      </div>
+      <div id="productCatalog" style="overflow-x:auto"></div>
+    </div>
+
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:6px">
+        <h2 style="margin:0" data-i18n>Artikel-Katalog</h2>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn btn-ghost btn-sm" data-click="exportArticleCatalog()" data-i18n>⬇ Export</button>
+          <button class="btn btn-ghost btn-sm" data-click="openArticleImport()" data-i18n>⬆ Import</button>
+          <button class="btn btn-primary btn-sm" data-click="openArticleModal()" data-i18n>+ Neuer Artikel</button>
+        </div>
+      </div>
+      <div class="sub" style="font-size:12px;color:var(--text-3);margin-bottom:12px" data-i18n>Alle Artikel vorab hinterlegen — dann wählt der Außendienst die Artikel-Nr. nur noch aus, Bezeichnung und Gebinde füllen sich automatisch.</div>
+      <div id="articleCatalog" style="overflow-x:auto"></div>
+    </div>
+  </section>
+
+  <!-- ════════════════ ANSICHT: CONTAINERRECHNER ════════════════ -->
+  <section class="view hidden" id="v-container" aria-label="Containerrechner">
+    <div class="view-head">
+      <div>
+        <h1 data-i18n>Containerrechner</h1>
+        <div class="sub">Beladung, Stauplan-Referenz und Container-Empfehlung (Europalette 120×80 cm)</div>
+      </div>
+    </div>
+
+    <!-- Beladungsrechner -->
+    <div class="card">
+      <h2 data-i18n>🧮 Beladungsrechner</h2>
+      <div class="form-row-4">
+        <div class="form-group">
+          <label class="form-label" data-i18n>Container-Typ</label>
+          <select class="form-select" id="fCLContainerType" data-change="onContainerTypeChange()">
+            <option value="20ft">20' Standard (11 Pal.)</option>
+            <option value="40ft">40' Standard (23 Pal.)</option>
+            <option value="40hc" selected>40' High Cube (23 Pal.)</option>
+            <option value="45hc">45' High Cube (26 Pal.)</option>
+            <option value="20ot">20' Open Top</option>
+            <option value="40ot">40' Open Top</option>
+            <option value="20rf">20' Reefer</option>
+            <option value="40rf">40' Reefer</option>
+            <option value="20fl">20' Flatrack</option>
+            <option value="40fl">40' Flatrack</option>
+            <option value="20tk">20' Tank</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label" data-i18n>Produkt-Preset</label>
+          <select class="form-select" id="fCLProductType" data-change="applyContainerPreset()">
+            <option value="030aa" selected>030AA Kanister 25kg</option>
+            <option value="015aa">015AA Kanister 10kg</option>
+            <option value="020xx">020XX Kanister 20kg</option>
+            <option value="064aa">064AA Karton groß 25kg</option>
+            <option value="carton-powder">027AA Kartons Pulver 25kg</option>
+            <option value="033aa">033AA Fass 25kg</option>
+            <option value="small-can">Kleine Kanister (5L/10L)</option>
+            <option value="ibc">IBC Container (1000L)</option>
+            <option value="drums-200l">Fässer / Drums (200L)</option>
+            <option value="custom">— Eigene Werte —</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label" data-i18n>Einheit</label>
+          <select class="form-select" id="fCLUnit" data-change="calcContainerLoad()">
+            <option value="kanister">Kanister</option>
+            <option value="karton">Kartons</option>
+            <option value="fass">Fässer</option>
+            <option value="ibc">IBC</option>
+            <option value="stueck">Stück</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label" data-i18n>Gewicht je Einheit (kg, optional)</label>
+          <input type="number" class="form-input" id="fCLUnitWeight" min="0" step="any" placeholder="z.B. 26,35" data-input="calcContainerLoad()">
+        </div>
+      </div>
+
+      <div class="form-row-4">
+        <div class="form-group">
+          <label class="form-label" data-i18n>Paletten UNTEN</label>
+          <input type="number" class="form-input" id="fCLPalLower" min="0" value="23" data-input="calcContainerLoad()">
+        </div>
+        <div class="form-group">
+          <label class="form-label" data-i18n>Lagen UNTEN</label>
+          <input type="number" class="form-input" id="fCLLayersLower" min="1" value="3" data-input="calcContainerLoad()">
+        </div>
+        <div class="form-group">
+          <label class="form-label" data-i18n>Einheiten/Lage UNTEN</label>
+          <input type="number" class="form-input" id="fCLUnitsPerLayerLower" min="1" value="8" data-input="calcContainerLoad()">
+        </div>
+        <div class="form-group"></div>
+        <div class="form-group">
+          <label class="form-label" data-i18n>Paletten OBEN (gestapelt)</label>
+          <input type="number" class="form-input" id="fCLPalUpper" min="0" value="23" data-input="calcContainerLoad()">
+        </div>
+        <div class="form-group">
+          <label class="form-label" data-i18n>Lagen OBEN</label>
+          <input type="number" class="form-input" id="fCLLayersUpper" min="0" value="2" data-input="calcContainerLoad()">
+        </div>
+        <div class="form-group">
+          <label class="form-label" data-i18n>Einheiten/Lage OBEN</label>
+          <input type="number" class="form-input" id="fCLUnitsPerLayerUpper" min="0" value="8" data-input="calcContainerLoad()">
+        </div>
+        <div class="form-group"></div>
+      </div>
+
+      <div class="form-row-4">
+        <div class="form-group">
+          <label class="form-label" data-i18n>Lückenfüllung</label>
+          <select class="form-select" id="fCLGapFill" data-change="calcContainerLoad()">
+            <option value="none">Keine</option>
+            <option value="half">Halbe Paletten</option>
+            <option value="loose">Lose Einheiten</option>
+            <option value="both">Beides</option>
+          </select>
+        </div>
+        <div class="form-group" id="clGapHalfWrap" style="display:none">
+          <label class="form-label" data-i18n>Anzahl halbe Paletten</label>
+          <input type="number" class="form-input" id="fCLHalfPallets" min="0" value="0" data-input="calcContainerLoad()">
+        </div>
+        <div class="form-group">
+          <label class="form-label" data-i18n>Einheiten je ½-Palette</label>
+          <input type="number" class="form-input" id="fCLUnitsHalfPal" min="0" value="12" data-input="calcContainerLoad()">
+        </div>
+        <div class="form-group" id="clGapLooseWrap" style="display:none">
+          <label class="form-label" data-i18n>Lose Einheiten (Lücken)</label>
+          <input type="number" class="form-input" id="fCLLooseUnits" min="0" value="0" data-input="calcContainerLoad()">
+        </div>
+      </div>
+
+      <div class="cl-result-bar">
+        <span>Gesamt: <strong class="total" id="clCalcTotal">0</strong> <span id="clCalcUnitLabel">Kanister</span></span>
+        <span>Paletten: <strong id="clCalcPallets">0</strong></span>
+        <span>Unten: <strong id="clCalcLower">0</strong></span>
+        <span>Oben: <strong id="clCalcUpper">0</strong></span>
+        <span id="clCalcGapInfo" style="display:none;color:#d97706">Lücke: +<strong id="clCalcGapTotal">0</strong></span>
+        <span id="clCalcWeight" style="display:none"></span>
+      </div>
+    </div>
+
+    <!-- Stauplan-Referenz -->
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:12px">
+        <h2 style="margin:0" data-i18n>📐 Stauplan-Referenz</h2>
+        <div style="display:flex;gap:8px">
+          <select class="form-select" id="clVizContainer" style="width:auto" data-change="renderContainerViz()">
+            <option value="20ft">20' Standard</option>
+            <option value="40ft">40' Standard</option>
+            <option value="40hc" selected>40' High Cube</option>
+            <option value="45hc">45' High Cube</option>
+            <option value="20ot">20' Open Top</option>
+            <option value="40ot">40' Open Top</option>
+            <option value="20rf">20' Reefer</option>
+            <option value="40rf">40' Reefer</option>
+            <option value="20fl">20' Flatrack</option>
+            <option value="40fl">40' Flatrack</option>
+            <option value="20tk">20' Tank</option>
+          </select>
+          <select class="form-select" id="clVizProduct" style="width:auto" data-change="renderContainerViz()">
+            <option value="030aa" selected>030AA Kanister 25kg</option>
+            <option value="015aa">015AA Kanister 10kg</option>
+            <option value="020xx">020XX Kanister 20kg</option>
+            <option value="064aa">064AA Karton groß</option>
+            <option value="carton-powder">027AA Pulver-Kartons</option>
+            <option value="033aa">033AA Fass 25kg</option>
+            <option value="small-can">Kleine Kanister</option>
+            <option value="ibc">IBC</option>
+            <option value="drums-200l">200L Drums</option>
+          </select>
+        </div>
+      </div>
+      <div id="containerRefViz"></div>
+      <div id="containerRefSummary" style="margin-top:10px;font-size:12px;color:var(--text-2)"></div>
+    </div>
+
+    <!-- Schnell-Empfehlung -->
+    <div class="card">
+      <h2 data-i18n>🎯 Container-Empfehlung</h2>
+      <div class="form-row-4">
+        <div class="form-group">
+          <label class="form-label" data-i18n>Paletten</label>
+          <input type="number" class="form-input" id="fRecPallets" min="0" placeholder="z.B. 18" data-input="runContainerRecommend()">
+        </div>
+        <div class="form-group">
+          <label class="form-label" data-i18n>Gewicht (kg)</label>
+          <input type="number" class="form-input" id="fRecWeight" min="0" step="any" placeholder="z.B. 14000" data-input="runContainerRecommend()">
+        </div>
+        <div class="form-group">
+          <label class="form-label" data-i18n>Volumen (m³)</label>
+          <input type="number" class="form-input" id="fRecVolume" min="0" step="any" placeholder="optional" data-input="runContainerRecommend()">
+        </div>
+        <div class="form-group">
+          <label class="form-label" data-i18n>Transport</label>
+          <select class="form-select" id="fRecTransport" data-change="runContainerRecommend()">
+            <option value="sea" selected>Seefracht</option>
+            <option value="road">Straße (LKW)</option>
+            <option value="air">Luftfracht</option>
+          </select>
+        </div>
+      </div>
+      <div class="calc-result" id="recResult" style="display:none;font-size:13px"></div>
+    </div>
+  </section>
+
+</main>
+
+<!-- ════════════════ MODAL: ANFRAGE ════════════════ -->
+<div class="modal-overlay" id="mInquiry">
+  <div class="modal wide">
+    <div class="modal-title" id="mInqTitle">Neue Frachtanfrage</div>
+    <input type="hidden" id="editInqId">
+
+    <div class="tabs">
+      <button class="tab active" id="inqTabBasis" data-click="showInqTab('basis', el)" data-i18n>Basisdaten</button>
+      <button class="tab" id="inqTabArtikel" data-click="showInqTab('artikel', el)" data-i18n>Artikel &amp; Berechnung</button>
+      <button class="tab" id="inqTabProforma" data-click="showInqTab('proforma', el)" data-i18n>Warenwert / Proforma</button>
+      <button class="tab" id="inqTabAngebote" data-click="showInqTab('angebote', el)">Angebote <span class="tab-badge" id="bInqOffers">0</span></button>
+      <button class="tab" id="inqTabVerlauf" data-click="showInqTab('verlauf', el)" data-i18n>Verlauf</button>
+    </div>
+
+    <div id="inqRoleBanner" class="info-banner" style="display:none"></div>
+
+    <!-- Panel: Basisdaten -->
+    <div id="inqPanelBasis">
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label"><span data-i18n>Kunde</span> <span class="req">*</span></label>
+          <input class="form-input" id="fInqCustomer" placeholder="Firmenname">
+        </div>
+        <div class="form-group">
+          <label class="form-label" data-i18n>Referenz-Nr.</label>
+          <input class="form-input" id="fInqRefNr" placeholder="Kundenreferenz / Bestellnr.">
+        </div>
+      </div>
+      <div class="form-row-3">
+        <div class="form-group">
+          <label class="form-label"><span data-i18n>Zielland</span> <span class="req">*</span></label>
+          <select class="form-select" id="fInqCountry" data-change="onInqCountryChange()"></select>
+        </div>
+        <div class="form-group">
+          <label class="form-label" data-i18n>Zielort / Hafen</label>
+          <input class="form-input" id="fInqDestCity" placeholder="wird aus Land vorgeschlagen">
+        </div>
+        <div class="form-group">
+          <label class="form-label" data-i18n>Priorität</label>
+          <select class="form-select" id="fInqPriority">
+            <option value="normal">Normal</option>
+            <option value="hoch">🟡 Hoch</option>
+            <option value="dringend">🔴 Dringend</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-row-3">
+        <div class="form-group">
+          <label class="form-label" data-i18n>Wunschtermin (Abholung/Versand)</label>
+          <input type="date" class="form-input" id="fInqWunschtermin">
+        </div>
+        <div class="form-group"></div>
+        <div class="form-group"></div>
+      </div>
+      <div class="info-banner" id="inqCountryInfo" style="display:none"></div>
+      <div class="form-row-3">
+        <div class="form-group">
+          <label class="form-label"><span data-i18n>Transport</span> <span class="req">*</span></label>
+          <select class="form-select" id="fInqTransport" data-change="filterIncotermsByTransport(); inqCalcAll(); renderInqOffers()">
+            <option value="">— Wählen —</option>
+            <option value="sea">🚢 Seefracht</option>
+            <option value="air">✈️ Luftfracht</option>
+            <option value="road">🚚 Straße</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label"><span data-i18n>Incoterm</span> <span class="req">*</span></label>
+          <select class="form-select" id="fInqIncoterm">
+            <option value="">— Wählen —</option>
+            <option value="EXW">EXW — Ab Werk</option>
+            <option value="FCA">FCA — Frei Frachtführer</option>
+            <option value="FAS">FAS — Längsseits Schiff (See)</option>
+            <option value="FOB">FOB — Frei an Bord (See)</option>
+            <option value="CFR">CFR — Kosten &amp; Fracht (See)</option>
+            <option value="CIF">CIF — Kosten, Vers. &amp; Fracht (See)</option>
+            <option value="CPT">CPT — Fracht bezahlt bis</option>
+            <option value="CIP">CIP — Fracht &amp; Vers. bezahlt bis</option>
+            <option value="DAP">DAP — Geliefert benannter Ort</option>
+            <option value="DPU">DPU — Geliefert entladen</option>
+            <option value="DDP">DDP — Geliefert verzollt</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label" data-i18n>Gefahrgut</label>
+          <select class="form-select" id="fInqDG" data-change="toggleInqDGPanel(); inqCalcAll()">
+            <option value="no">Nein</option>
+            <option value="yes">⚠️ Ja</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-group" id="inqDGPanel" style="display:none">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+          <label class="form-label" style="margin-bottom:0" data-i18n>Gefahrgut-Positionen — aus Katalog wählen, Klasse/VG werden übernommen</label>
+          <button type="button" class="btn btn-ghost btn-sm" data-click="dgAddItem()" style="color:var(--danger)" data-i18n>+ Gefahrgut-Position</button>
+        </div>
+        <div id="inqDGList"></div>
+      </div>
+      <div class="form-row-4" id="inqPriceRow">
+        <div class="form-group cost-field">
+          <label class="form-label" data-i18n>Einkaufspreis EK (€)</label>
+          <input type="number" class="form-input" id="fInqCost" min="0" step="0.01" data-input="calcMU()">
+        </div>
+        <div class="form-group cost-field">
+          <label class="form-label" data-i18n>Aufschlag</label>
+          <select class="form-select" id="fInqMarkup" data-change="toggleCustomMarkup()">
+            <option value="10">10 %</option>
+            <option value="15">15 %</option>
+            <option value="30" selected>30 %</option>
+            <option value="custom">Eigener…</option>
+          </select>
+          <input type="number" class="form-input" id="fInqMarkupCustom" min="0" step="any" placeholder="%" style="display:none;margin-top:6px" data-input="calcMU()">
+        </div>
+        <div class="form-group vk-field">
+          <label class="form-label" data-i18n>Verkaufspreis VK (€)</label>
+          <input type="number" class="form-input" id="fInqSell" min="0" step="0.01">
+        </div>
+        <div class="form-group sped-field">
+          <label class="form-label" data-i18n>Spediteur</label>
+          <input class="form-input" id="fInqSpediteur" placeholder="Name / Kürzel">
+        </div>
+      </div>
+      <div class="form-row-3">
+        <div class="form-group">
+          <label class="form-label" data-i18n>Gewicht brutto (kg)</label>
+          <input type="number" class="form-input" id="fInqWeight" min="0" step="any" placeholder="aus Berechnung">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Volumen (m³)</label>
+          <input type="number" class="form-input" id="fInqVolume" min="0" step="any" placeholder="aus Berechnung">
+        </div>
+        <div class="form-group"></div>
+      </div>
+      <div class="form-group">
+        <label class="form-label" data-i18n>Notizen</label>
+        <textarea class="form-textarea" id="fInqNotes" rows="2" placeholder="Interne Bemerkungen…"></textarea>
+      </div>
+    </div>
+
+    <!-- Panel: Artikel & Berechnung -->
+    <div id="inqPanelArtikel" style="display:none">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+        <span style="font-size:12px;color:var(--text-2)" data-i18n>Mehrere Artikel möglich — Paletten, Gewicht und Volumen werden automatisch berechnet.</span>
+        <div style="display:flex;gap:8px">
+          <button class="btn btn-ghost btn-sm" data-click="inqClearArticles()" data-i18n>Alle entfernen</button>
+          <button class="btn btn-primary btn-sm" data-click="inqAddArticle()" data-i18n>+ Artikel hinzufügen</button>
+        </div>
+      </div>
+      <div id="inqArticlesList"></div>
+      <div class="calc-result" id="inqCalcResult" style="display:none"></div>
+    </div>
+
+    <!-- Panel: Warenwert / Proforma -->
+    <div id="inqPanelProforma" style="display:none">
+      <div id="inqProformaList"></div>
+    </div>
+
+    <!-- Panel: Angebote -->
+    <div id="inqPanelAngebote" style="display:none">
+      <div style="display:flex;justify-content:flex-end;margin-bottom:10px">
+        <button class="btn btn-primary btn-sm" data-click="addInqOffer()" data-i18n>+ Angebot hinzufügen</button>
+      </div>
+      <div id="inqOffersContainer"></div>
+      <div id="inqOfferComparison" style="display:none;margin-top:12px"></div>
+    </div>
+
+    <!-- Panel: Verlauf -->
+    <div id="inqPanelVerlauf" style="display:none">
+      <div id="inqTimeline"></div>
+    </div>
+
+    <div class="form-footer">
+      <button class="btn btn-ghost" data-click="closeM('mInquiry')" data-i18n>Abbrechen</button>
+      <button class="btn btn-primary" data-click="saveInquiry()" data-i18n>💾 Anfrage speichern</button>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════ MODAL: PACKSTÜCK ════════════════ -->
+<div class="modal-overlay" id="mPackstueck">
+  <div class="modal" style="max-width:560px">
+    <div class="modal-title" id="mPackTitle">Neues Packstück</div>
+    <div class="form-row-3">
+      <div class="form-group">
+        <label class="form-label">Code <span class="req">*</span></label>
+        <input class="form-input" id="fPackCode" placeholder="z.B. 099AA" style="text-transform:uppercase">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Name</label>
+        <input class="form-input" id="fPackName" placeholder="z.B. Kanister 5kg">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Emoji</label>
+        <input class="form-input" id="fPackEmoji" placeholder="📦">
+      </div>
+    </div>
+    <div class="form-row-3">
+      <div class="form-group">
+        <label class="form-label">Länge (mm)</label>
+        <input type="number" class="form-input" id="fPackL" min="0">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Breite (mm)</label>
+        <input type="number" class="form-input" id="fPackW" min="0">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Höhe (mm)</label>
+        <input type="number" class="form-input" id="fPackH" min="0">
+      </div>
+    </div>
+    <div class="form-row-3">
+      <div class="form-group">
+        <label class="form-label">Leergewicht (kg)</label>
+        <input type="number" class="form-input" id="fPackEmptyWt" min="0" step="any">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Füllgewicht (kg)</label>
+        <input type="number" class="form-input" id="fPackFillWt" min="0" step="any">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Max. lose (Stk)</label>
+        <input type="number" class="form-input" id="fPackMaxLoose" min="0">
+      </div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Lagen (eine Zeile pro Lage: "LagenNr: Höhe cm, Stück gesamt")</label>
+      <textarea class="form-textarea" id="fPackLayers" rows="4" placeholder="1: 55 cm, 8 Stk&#10;2: 95 cm, 16 Stk&#10;3: 135 cm, 20 Stk"></textarea>
+    </div>
+    <div class="form-footer">
+      <button class="btn btn-ghost" data-click="closeM('mPackstueck')">Abbrechen</button>
+      <button class="btn btn-primary" data-click="savePackstueck()">💾 Speichern</button>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════ MODAL: ARTIKEL (Einzel) ════════════════ -->
+<div class="modal-overlay" id="mArticle">
+  <div class="modal" style="max-width:520px">
+    <div class="modal-title" id="mArticleTitle" data-i18n>Neuer Artikel</div>
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label"><span data-i18n>Artikel-Nr.</span> <span class="req">*</span></label>
+        <input class="form-input" id="fArtNr" placeholder="z.B. ETH-9600 · …30A" data-input="onArtNrInput('$value')">
+      </div>
+      <div class="form-group">
+        <label class="form-label" data-i18n>Standard-Gebinde</label>
+        <select class="form-select" id="fArtCode"></select>
+      </div>
+    </div>
+    <div class="form-group">
+      <label class="form-label" data-i18n>Bezeichnung</label>
+      <input class="form-input" id="fArtName" placeholder="z.B. Ethanol 96% vergällt">
+    </div>
+    <div class="form-footer">
+      <button class="btn btn-ghost" data-click="closeM('mArticle')" data-i18n>Abbrechen</button>
+      <button class="btn btn-primary" data-click="saveArticleEntry()" data-i18n>💾 Speichern</button>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════ MODAL: ARTIKEL-IMPORT ════════════════ -->
+<div class="modal-overlay" id="mArticleImport">
+  <div class="modal" style="max-width:600px">
+    <div class="modal-title" data-i18n>Artikel importieren</div>
+    <div class="sub" style="font-size:12px;color:var(--text-2);margin-bottom:10px" data-i18n>Als JSON-Array oder als Zeilen „Artikel-Nr.; Bezeichnung; Gebinde-Code" (eine Zeile je Artikel; Trenner Semikolon, Komma oder Tab). Fehlt der Gebinde-Code, wird er aus dem Nummern-Suffix erkannt (z.B. …30A → 030AA).</div>
+    <div class="form-group">
+      <textarea class="form-textarea" id="fArtImport" rows="12" style="font-family:ui-monospace,monospace;font-size:12px" placeholder="ETH-9600; Ethanol 96% vergällt; 030AA&#10;ISO-2000; Isopropanol technisch; 020XX&#10;&#10;— oder —&#10;[{&quot;artNr&quot;:&quot;ETH-9600&quot;,&quot;name&quot;:&quot;Ethanol 96%&quot;,&quot;code&quot;:&quot;030AA&quot;}]"></textarea>
+    </div>
+    <div class="form-footer">
+      <button class="btn btn-ghost" data-click="closeM('mArticleImport')" data-i18n>Abbrechen</button>
+      <button class="btn btn-primary" data-click="runArticleImport()" data-i18n>⬆ Importieren</button>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════ MODAL: EINSTELLUNGEN ════════════════ -->
+<div class="modal-overlay" id="mSettings">
+  <div class="modal" style="max-width:520px">
+    <div class="modal-title" data-i18n>⚙️ Einstellungen</div>
+    <div class="form-group">
+      <label class="form-label" data-i18n>Absender-Name (für generierte E-Mails)</label>
+      <input class="form-input" id="fSetSender" placeholder="Vor- und Nachname">
+    </div>
+    <div class="form-group">
+      <label class="form-label" data-i18n>E-Mail Innendienst</label>
+      <input type="email" class="form-input" id="fSetInnendienst" placeholder="innendienst@firma.de">
+    </div>
+    <div class="form-group">
+      <label class="form-label" data-i18n>E-Mail Team Transport</label>
+      <input type="email" class="form-input" id="fSetTransport" placeholder="transport@firma.de">
+    </div>
+    <div class="form-group">
+      <label class="form-label" data-i18n>E-Mail Außendienst (für Rückmeldungen)</label>
+      <input type="email" class="form-input" id="fSetAussendienst" placeholder="aussendienst@firma.de">
+    </div>
+    <div class="form-group">
+      <label class="form-label" data-i18n>Abgangsort (für Speditions-Anfragen)</label>
+      <input class="form-input" id="fSetAbgang" placeholder="z.B. 47441 Moers, Deutschland">
+    </div>
+    <div class="form-footer">
+      <button class="btn btn-ghost" data-click="closeM('mSettings')" data-i18n>Abbrechen</button>
+      <button class="btn btn-primary" data-click="saveSettings()" data-i18n>💾 Speichern</button>
+    </div>
+  </div>
+</div>
+
+<!-- Skripte: Reihenfolge relevant (Globals) -->
+<script src="js/helpers.js"></script>
+<script src="js/i18n.js"></script>
+<script src="js/countries.js"></script>
+<script src="js/products.js"></script>
+<script src="js/container.js"></script>
+<script src="js/inquiry-form.js"></script>
+<script src="js/inquiry-crud.js"></script>
+<script src="js/roles.js"></script>
+<script src="js/inquiry-list.js"></script>
+<script src="js/pallet-view.js"></script>
+<script src="js/article-catalog.js"></script>
+<script src="js/proforma.js"></script>
+<script src="js/app.js"></script>
+<footer style="text-align:center;padding:16px;font-size:12px;color:#8a94a6;border-top:1px solid rgba(128,128,128,.2);margin-top:24px">
+  © <span id="footYear"></span> Rawkeep · Frakibou Imqhamed ·
+  <a href="impressum.html" style="color:inherit">Impressum</a> ·
+  <a href="datenschutz.html" style="color:inherit">Datenschutz</a>
+</footer>
+<script>var _fy=document.getElementById('footYear');if(_fy)_fy.textContent=new Date().getFullYear();</script>
+</body>
+</html>
