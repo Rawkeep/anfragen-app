@@ -1,5 +1,5 @@
 // Service Worker — Offline-Cache für die Anfragen-App
-const CACHE = 'anfragen-v18';
+const CACHE = 'anfragen-v17';
 const ASSETS = [
   './',
   './index.html',
@@ -14,7 +14,6 @@ const ASSETS = [
   './js/inquiry-form.js',
   './js/inquiry-crud.js',
   './js/roles.js',
-  './js/handoff.js',
   './js/inquiry-list.js',
   './js/pallet-view.js',
   './js/article-catalog.js',

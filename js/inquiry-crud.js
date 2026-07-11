@@ -258,8 +258,7 @@ function renderInqTimeline() {
   const labels = {
     created: '📝 Erstellt', edited: '✏️ Bearbeitet', quoted: '✉️ Angeboten',
     accepted: '✅ Angenommen', rejected: '❌ Abgelehnt', open: '🔓 Wieder geöffnet',
-    'email-sent': '✉️ E-Mail gesendet',
-    'handoff-received': '📲 Per Übergabe-Link übernommen'
+    'email-sent': '✉️ E-Mail gesendet'
   };
   wrap.innerHTML = [...hist].reverse().map(h => `
     <div style="display:flex;gap:10px;padding:8px 0;border-bottom:1px solid var(--border-light);font-size:12px">

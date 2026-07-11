@@ -400,8 +400,7 @@ function sendToInnendienst(id) {
     i.notes ? (en ? 'Note: ' : 'Bemerkung: ') + i.notes + '\n' : null,
     _signature()
   ].filter(l => l !== null).join('\n');
-  // Übergabe-Link trägt den Vorgang im Zielzustand (Stab beim Innendienst)
-  showMailPreviewWithHandoff(i, { status: 'neu' }, {
+  showMailPreview({
     to: appSettings.innendienstEmail, subject, body,
     note: en ? 'After sending, the baton passes to Inside Sales.' : 'Nach dem Senden geht der Staffelstab an den Innendienst.',
     onSend: () => {
@@ -441,7 +440,7 @@ function forwardToTransport(id) {
     '',
     _signature()
   ].filter(l => l !== null).join('\n');
-  showMailPreviewWithHandoff(i, { status: 'transport' }, {
+  showMailPreview({
     to: appSettings.transportEmail, subject, body,
     note: en ? 'After sending, the status changes to "With Transport".' : 'Nach dem Senden wechselt der Status auf „Bei Transport".',
     onSend: () => {
@@ -545,12 +544,7 @@ function handFreightToInnendienst(id) {
     '',
     _signature()
   ].filter(l => l !== null).join('\n');
-  // Link spiegelt, was onSend lokal setzt: VK, Gültigkeit, ggf. EK/Spediteur
-  const handoffState = Object.assign(
-    { status: 'kalkuliert', sellPrice: vk, offerValidUntil: validUntil },
-    offers.length ? { costPrice: bestCost, spediteur: i.spediteur || bestSped } : {}
-  );
-  showMailPreviewWithHandoff(i, handoffState, {
+  showMailPreview({
     to: appSettings.innendienstEmail, subject, body,
     note: en
       ? 'After sending: status "Freight costs determined" — Inside Sales adds goods values.'
@@ -593,7 +587,7 @@ function sendFeedbackToField(id) {
     '',
     _signature()
   ].filter(l => l !== null).join('\n');
-  showMailPreviewWithHandoff(i, { status: 'beantwortet' }, {
+  showMailPreview({
     to: appSettings.aussendienstEmail, subject, body,
     note: en
       ? 'After sending, the status changes to "Answered" — everyone gets the price + validity.'
@@ -627,8 +621,7 @@ function sendFinalFeedback(i, decision, reason, note) {
     '',
     _signature()
   ].filter(l => l !== null).join('\n');
-  // Status (angenommen/abgelehnt) ist hier bereits gesetzt — kein Override nötig
-  showMailPreviewWithHandoff(i, null, {
+  showMailPreview({
     to: appSettings.innendienstEmail, subject, body,
     note: en ? 'Final feedback of the customer decision to Inside Sales.' : 'Finale Rückmeldung der Kundenentscheidung an den Innendienst.'
   });
